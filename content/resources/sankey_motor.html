@@ -1,0 +1,217 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>¿Adónde va la energía del combustible?</title>
+<style>
+  :root{
+    color-scheme: light;
+    --navy:#3b3a7a; --navy-2:#2a295a; --blue:#2f6fb0; --teal:#0f8a8f;
+    --orange:#e67e22; --red:#b23b3b; --green:#2a7d4f; --ink:#24313a; --muted:#5d6b74;
+    --line:#d6dbe5; --paper:#fff; --wash:#f4f4fa; --focus:#ffd166;
+    font-family: system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0;background:transparent;color:var(--ink)}
+  body{padding:8px}
+  .lab{max-width:1120px;margin:0 auto;overflow:hidden;border:1px solid #cfd3e3;
+       border-radius:16px;background:var(--paper);box-shadow:0 8px 24px rgb(35 40 93 / 10%)}
+  .lab-header{display:flex;align-items:flex-start;justify-content:space-between;gap:20px;
+       padding:18px 22px;color:#fff;background:linear-gradient(125deg,var(--navy-2),var(--navy))}
+  .lab-header h1{margin:0 0 4px;font-size:clamp(1.16rem,2.2vw,1.5rem);line-height:1.2}
+  .lab-header p{max-width:740px;margin:0;color:#e6e6f3;font-size:.92rem;line-height:1.45}
+  .badge{flex:0 0 auto;padding:6px 10px;border:1px solid rgb(255 255 255/32%);
+       border-radius:999px;background:rgb(255 255 255/10%);font-size:.78rem;white-space:nowrap}
+  .readout{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px;
+       padding:14px 18px;border-bottom:1px solid var(--line);background:var(--wash)}
+  .metric{padding:10px 12px;border:1px solid #dcdfec;border-radius:10px;background:#fff}
+  .metric .label{display:block;margin-bottom:2px;color:var(--muted);font-size:.7rem;
+       font-weight:700;letter-spacing:.055em;text-transform:uppercase}
+  .metric output{display:block;color:var(--navy-2);font-size:1.02rem;font-weight:750}
+  .metric.destacada{border-left:5px solid var(--green)}
+  .cuerpo{display:grid;grid-template-columns:minmax(300px,1fr) minmax(260px,320px)}
+  @media (max-width:860px){.cuerpo{grid-template-columns:1fr}}
+  .escena{padding:12px 18px 6px}
+  .panel{padding:16px 18px;border-left:1px solid var(--line);background:#fbfbfe}
+  @media (max-width:860px){.panel{border-left:0;border-top:1px solid var(--line)}}
+  .campo{margin-bottom:13px}
+  .campo label{display:block;margin-bottom:4px;font-size:.82rem;font-weight:600;color:var(--navy-2)}
+  .campo .valor{float:right;font-weight:700;color:var(--blue)}
+  input[type=range]{width:100%;accent-color:var(--blue)}
+  input:focus-visible,button:focus-visible{outline:3px solid var(--focus);outline-offset:2px}
+  .nota{margin:0 18px 16px;color:var(--muted);font-size:.8rem;line-height:1.5}
+  svg{display:block;width:100%;height:auto}
+  .leyenda{display:flex;flex-wrap:wrap;gap:12px;padding:0 18px 14px;font-size:.82rem}
+  .leyenda span{display:inline-flex;align-items:center;gap:6px}
+  .leyenda i{width:14px;height:14px;border-radius:3px;display:inline-block}
+</style>
+</head>
+<body>
+<div class="lab">
+  <div class="lab-header">
+    <div>
+      <h1>¿Adónde va la energía del combustible?</h1>
+      <p>El ancho de cada banda es proporcional a la potencia. Mueve los mandos y mira cuánta
+         energía llega de verdad a las ruedas y cuánta se pierde por el camino.</p>
+    </div>
+    <span class="badge">Rendimiento y eficiencia</span>
+  </div>
+
+  <div class="readout">
+    <div class="metric"><span class="label">Consumo</span><output id="oM">—</output></div>
+    <div class="metric"><span class="label">Potencia aportada</span><output id="oPap">—</output></div>
+    <div class="metric"><span class="label">Potencia del motor</span><output id="oPe">—</output></div>
+    <div class="metric destacada"><span class="label">Potencia en las ruedas</span><output id="oPu">—</output></div>
+    <div class="metric"><span class="label">Par motor</span><output id="oM2">—</output></div>
+    <div class="metric"><span class="label">Rendimiento total</span><output id="oEta">—</output></div>
+  </div>
+
+  <div class="cuerpo">
+    <div class="escena">
+      <svg id="dib" viewBox="0 0 860 340" role="img" aria-labelledby="ttl desc">
+        <title id="ttl">Diagrama de Sankey del reparto de la energía de un motor</title>
+        <desc id="desc">Una banda de entrada, la energía del combustible, se divide en cuatro
+          salidas de anchura proporcional: potencia en las ruedas, pérdidas mecánicas de la
+          transmisión, calor de los gases de escape y calor evacuado por la refrigeración.</desc>
+        <g id="bandas"></g>
+      </svg>
+    </div>
+
+    <div class="panel">
+      <div class="campo">
+        <label for="caudal">Caudal de combustible <span class="valor" id="vCaudal"></span></label>
+        <input type="range" id="caudal" min="5" max="40" step="0.5" value="30.5">
+      </div>
+      <div class="campo">
+        <label for="pci">Poder calorífico <span class="valor" id="vPci"></span></label>
+        <input type="range" id="pci" min="6000" max="12000" step="20" value="9960">
+      </div>
+      <div class="campo">
+        <label for="dens">Densidad <span class="valor" id="vDens"></span></label>
+        <input type="range" id="dens" min="0.70" max="0.90" step="0.01" value="0.75">
+      </div>
+      <div class="campo">
+        <label for="et">Rendimiento térmico <span class="valor" id="vEt"></span></label>
+        <input type="range" id="et" min="10" max="45" step="1" value="25">
+      </div>
+      <div class="campo">
+        <label for="etr">Rendimiento de la transmisión <span class="valor" id="vEtr"></span></label>
+        <input type="range" id="etr" min="80" max="100" step="1" value="95">
+      </div>
+      <div class="campo">
+        <label for="rpm">Régimen de giro <span class="valor" id="vRpm"></span></label>
+        <input type="range" id="rpm" min="500" max="8000" step="100" value="5000">
+      </div>
+      <div class="campo">
+        <label for="rep">De las pérdidas térmicas, por el escape <span class="valor" id="vRep"></span></label>
+        <input type="range" id="rep" min="30" max="70" step="1" value="55">
+      </div>
+    </div>
+  </div>
+
+  <p class="nota" id="pie"></p>
+</div>
+
+<script>
+"use strict";
+
+/* ---------- cálculo (función pura: se puede probar fuera del navegador) ---------- */
+var KCAL = 4180;            // J por kcal (1 cal = 4,18 J en toda la unidad)
+var CV = 735.5;             // W por CV
+
+function calcular(p){
+  var m   = p.caudal * p.dens;                 // kg/h  (1 l = 1 dm³)
+  var Pap = m * p.pci * KCAL / 3600;           // W aportados por el combustible
+  var Pe  = Pap * p.et / 100;                  // W en el eje del motor
+  var Pu  = Pe * p.etr / 100;                  // W en las ruedas
+  var mec = Pe - Pu;                           // pérdidas de la transmisión
+  var ter = Pap - Pe;                          // pérdidas térmicas
+  var esc = ter * p.rep / 100;                 // por el escape
+  var ref = ter - esc;                         // por la refrigeración
+  var w   = 2 * Math.PI * p.rpm / 60;
+  var par = w > 0 ? Pe / w : 0;                // N·m
+  var ge  = Pe > 0 ? (m * 1000) / (Pe / 1000) : 0;   // g/kWh
+  return {m:m, Pap:Pap, Pe:Pe, Pu:Pu, mec:mec, ter:ter, esc:esc, ref:ref,
+          w:w, par:par, ge:ge, eta:(Pap > 0 ? Pu / Pap : 0)};
+}
+
+if (typeof module !== "undefined" && module.exports) { module.exports = {calcular:calcular}; }
+
+/* ---------- interfaz ---------- */
+if (typeof document !== "undefined") (function(){
+  var $ = function(id){ return document.getElementById(id); };
+  var num = function(x,d){ return x.toLocaleString("es-ES",{minimumFractionDigits:d,maximumFractionDigits:d}); };
+
+  function leer(){
+    return {caudal:+$("caudal").value, pci:+$("pci").value, dens:+$("dens").value,
+            et:+$("et").value, etr:+$("etr").value, rpm:+$("rpm").value, rep:+$("rep").value};
+  }
+
+  var SALIDAS = [
+    {k:"Pu",  etq:"Ruedas",             color:"#2a7d4f"},
+    {k:"mec", etq:"Pérdidas mecánicas", color:"#2f6fb0"},
+    {k:"esc", etq:"Escape",             color:"#b23b3b"},
+    {k:"ref", etq:"Refrigeración",      color:"#e67e22"}
+  ];
+
+  function sankey(r){
+    var H = 250, y0 = 48, xIn = 20, xSplit = 250, xOut = 430, xTxt = 470;
+    var partes = [];
+    partes.push('<rect x="'+xIn+'" y="'+y0+'" width="'+(xSplit-xIn)+'" height="'+H+'" fill="#c9b79a" opacity=".85"/>');
+    partes.push('<text x="'+(xIn+8)+'" y="'+(y0-14)+'" font-size="13" font-weight="700" fill="#5b4a30">'
+              + 'Combustible \u00b7 '+num(r.Pap/1000,1)+' kW</text>');
+    var y = y0;
+    SALIDAS.forEach(function(s, i){
+      var v = r[s.k];
+      var h = r.Pap > 0 ? H * v / r.Pap : 0;
+      var yc = y + h/2;
+      var yTxt = y0 + 26 + i*68;                 // ranura fija: las bandas finas tambi\u00e9n se leen
+      partes.push('<rect x="'+xSplit+'" y="'+y.toFixed(2)+'" width="'+(xOut-xSplit)+'" height="'
+                + Math.max(h,1).toFixed(2)+'" fill="'+s.color+'" opacity=".9"><title>'+s.etq+': '
+                + num(v/1000,1)+' kW ('+num(r.Pap>0?100*v/r.Pap:0,1)+' %)</title></rect>');
+      partes.push('<path d="M '+xOut+' '+yc.toFixed(2)+' L '+(xTxt-14)+' '+yTxt+' L '+(xTxt-6)+' '+yTxt+'" '
+                + 'fill="none" stroke="'+s.color+'" stroke-width="1.5" opacity=".8"/>');
+      partes.push('<rect x="'+xTxt+'" y="'+(yTxt-9)+'" width="11" height="11" rx="2" fill="'+s.color+'"/>');
+      partes.push('<text x="'+(xTxt+18)+'" y="'+(yTxt+1)+'" font-size="13" fill="#24313a">'+s.etq+'</text>');
+      partes.push('<text x="'+(xTxt+18)+'" y="'+(yTxt+19)+'" font-size="13" fill="#24313a" font-weight="700">'
+                + num(v/1000,1)+' kW <tspan font-weight="400" fill="#5d6b74">('
+                + num(r.Pap>0?100*v/r.Pap:0,1)+' %)</tspan></text>');
+      y += h;
+    });
+    return partes.join("");
+  }
+
+  function pintar(){
+    var p = leer(), r = calcular(p);
+    $("vCaudal").textContent = num(p.caudal,1)+" l/h";
+    $("vPci").textContent    = num(p.pci,0)+" kcal/kg";
+    $("vDens").textContent   = num(p.dens,2)+" kg/dm³";
+    $("vEt").textContent     = p.et+" %";
+    $("vEtr").textContent    = p.etr+" %";
+    $("vRpm").textContent    = num(p.rpm,0)+" rpm";
+    $("vRep").textContent    = p.rep+" %";
+
+    $("oM").textContent   = num(r.m,2)+" kg/h";
+    $("oPap").textContent = num(r.Pap/1000,1)+" kW";
+    $("oPe").textContent  = num(r.Pe/1000,1)+" kW  ("+num(r.Pe/CV,1)+" CV)";
+    $("oPu").textContent  = num(r.Pu/1000,1)+" kW  ("+num(r.Pu/CV,1)+" CV)";
+    $("oM2").textContent  = num(r.par,1)+" N·m";
+    $("oEta").textContent = num(100*r.eta,1)+" %";
+
+    $("bandas").innerHTML = sankey(r);
+    $("pie").textContent =
+      "De los "+num(r.Pap/1000,1)+" kW que entran con el combustible, llegan a las ruedas "
+      + num(r.Pu/1000,1)+" kW: un rendimiento total del "+num(100*r.eta,1)+" %. "
+      + "Consumo específico: "+num(r.ge,0)+" g/kWh. El reparto entre escape y refrigeración lo eliges tú; "
+      + "el resto sale de los datos.";
+  }
+
+  ["caudal","pci","dens","et","etr","rpm","rep"].forEach(function(id){
+    $(id).addEventListener("input", pintar);
+  });
+  pintar();
+})();
+</script>
+</body>
+</html>

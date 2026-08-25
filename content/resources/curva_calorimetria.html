@@ -1,0 +1,418 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Calor, temperatura y cambios de estado</title>
+<style>
+  :root{
+    color-scheme: light;
+    --navy:#3b3a7a; --navy-2:#2a295a; --blue:#2f6fb0; --teal:#0f8a8f;
+    --orange:#e67e22; --red:#b23b3b; --ink:#24313a; --muted:#5d6b74;
+    --line:#d6dbe5; --paper:#fff; --wash:#f4f4fa; --focus:#ffd166;
+    font-family: system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0;background:transparent;color:var(--ink)}
+  body{padding:8px}
+  .lab{max-width:1120px;margin:0 auto;overflow:hidden;border:1px solid #cfd3e3;
+       border-radius:16px;background:var(--paper);box-shadow:0 8px 24px rgb(35 40 93 / 10%)}
+  .lab-header{display:flex;align-items:flex-start;justify-content:space-between;gap:20px;
+       padding:18px 22px;color:#fff;background:linear-gradient(125deg,var(--navy-2),var(--navy))}
+  .lab-header h1{margin:0 0 4px;font-size:clamp(1.16rem,2.2vw,1.5rem);line-height:1.2}
+  .lab-header p{max-width:740px;margin:0;color:#e6e6f3;font-size:.92rem;line-height:1.45}
+  .badge{flex:0 0 auto;padding:6px 10px;border:1px solid rgb(255 255 255/32%);
+       border-radius:999px;background:rgb(255 255 255/10%);font-size:.78rem;white-space:nowrap}
+  .modos{display:flex;gap:8px;padding:12px 18px 0}
+  .modos button{padding:7px 14px;border:1px solid var(--navy);border-radius:999px;
+       background:#fff;color:var(--navy);font:inherit;font-weight:600;cursor:pointer}
+  .modos button[aria-pressed=true]{background:var(--navy);color:#fff}
+  .readout{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px;
+       padding:14px 18px;border-bottom:1px solid var(--line);background:var(--wash)}
+  .metric{padding:10px 12px;border:1px solid #dcdfec;border-radius:10px;background:#fff}
+  .metric .label{display:block;margin-bottom:2px;color:var(--muted);font-size:.7rem;
+       font-weight:700;letter-spacing:.055em;text-transform:uppercase}
+  .metric output{display:block;color:var(--navy-2);font-size:1.02rem;font-weight:750}
+  .metric.destacada{border-left:5px solid var(--orange)}
+  .cuerpo{display:grid;grid-template-columns:minmax(280px,1fr) minmax(260px,320px);gap:0}
+  @media (max-width:820px){.cuerpo{grid-template-columns:1fr}}
+  .escena{padding:12px 18px 18px}
+  .panel{padding:16px 18px;border-left:1px solid var(--line);background:#fbfbfe}
+  @media (max-width:820px){.panel{border-left:0;border-top:1px solid var(--line)}}
+  .campo{margin-bottom:14px}
+  .campo label{display:block;margin-bottom:4px;font-size:.82rem;font-weight:600;color:var(--navy-2)}
+  .campo .valor{float:right;font-weight:700;color:var(--blue)}
+  input[type=range]{width:100%;accent-color:var(--blue)}
+  select{width:100%;padding:6px 8px;border:1px solid var(--line);border-radius:8px;
+       background:#fff;font:inherit;color:inherit}
+  input:focus-visible,select:focus-visible,button:focus-visible{outline:3px solid var(--focus);outline-offset:2px}
+  .formula{margin:2px 0 14px;padding:10px 12px;border:1.5px solid var(--orange);
+       border-radius:10px;background:#fef6ec;color:#8a4f12;font-size:.98rem;text-align:center}
+  .botones{display:flex;gap:8px;flex-wrap:wrap}
+  button.accion{padding:8px 14px;border:1px solid var(--navy);border-radius:8px;background:var(--navy);
+       color:#fff;font:inherit;font-weight:600;cursor:pointer}
+  button.sec{background:#fff;color:var(--navy)}
+  .aviso{margin-top:10px;padding:8px 10px;border-left:4px solid var(--teal);background:#eaf6f6;
+       color:#0a5f63;font-size:.85rem;border-radius:6px}
+  .aviso[hidden]{display:none}
+  .nota{margin:10px 18px 16px;color:var(--muted);font-size:.8rem;line-height:1.5}
+  svg{display:block;width:100%;height:auto}
+  [hidden]{display:none !important}
+</style>
+</head>
+<body>
+<div class="lab">
+  <div class="lab-header">
+    <div>
+      <h1>Calor, temperatura y cambios de estado</h1>
+      <p>Dos experiencias con el mismo balance de energía: calentar una sustancia hasta que
+         cambia de estado y mezclar dos cuerpos hasta que igualan su temperatura.</p>
+    </div>
+    <span class="badge">Calorimetría</span>
+  </div>
+
+  <div class="modos">
+    <button id="btnA" aria-pressed="true">Curva T–Q</button>
+    <button id="btnB" aria-pressed="false">Mezclador</button>
+  </div>
+
+  <!-- ══════════ MODO A ══════════ -->
+  <div id="modoA">
+    <div class="readout">
+      <div class="metric"><span class="label">Estado</span><output id="aEstado">—</output></div>
+      <div class="metric destacada"><span class="label">Temperatura</span><output id="aT">—</output></div>
+      <div class="metric"><span class="label">Calor aportado</span><output id="aQ">—</output></div>
+      <div class="metric"><span class="label">Calor hasta fundir todo</span><output id="aQf">—</output></div>
+      <div class="metric"><span class="label">Calor hasta evaporar todo</span><output id="aQv">—</output></div>
+    </div>
+    <div class="cuerpo">
+      <div class="escena">
+        <svg id="graf" viewBox="0 0 520 320" role="img" aria-label="Gráfica de temperatura frente a calor aportado"></svg>
+        <p class="nota" id="aPie"></p>
+      </div>
+      <div class="panel">
+        <div class="campo">
+          <label for="aSust">Sustancia</label>
+          <select id="aSust">
+            <option value="agua" selected>Agua (hielo → líquido → vapor)</option>
+            <option value="hierro">Hierro</option>
+            <option value="aluminio">Aluminio</option>
+            <option value="cobre">Cobre</option>
+          </select>
+        </div>
+        <p class="formula" id="aFormula">Q = m · c · ΔT &nbsp;·&nbsp; Q = m · L</p>
+        <div class="campo">
+          <label for="aMasa">Masa <span class="valor" id="vAMasa"></span></label>
+          <input type="range" id="aMasa" min="0.1" max="2" step="0.1" value="1">
+        </div>
+        <div class="campo">
+          <label for="aT0">Temperatura inicial <span class="valor" id="vAT0"></span></label>
+          <input type="range" id="aT0" min="-40" max="80" step="1" value="-20">
+        </div>
+        <div class="campo">
+          <label for="aQin">Calor aportado <span class="valor" id="vAQ"></span></label>
+          <input type="range" id="aQin" min="0" max="2000" step="5" value="400">
+        </div>
+        <p class="aviso" id="aAviso" hidden></p>
+      </div>
+    </div>
+  </div>
+
+  <!-- ══════════ MODO B ══════════ -->
+  <div id="modoB" hidden>
+    <div class="readout">
+      <div class="metric destacada"><span class="label">Temperatura de equilibrio</span><output id="bTeq">—</output></div>
+      <div class="metric"><span class="label">Calor cedido por el caliente</span><output id="bQced">—</output></div>
+      <div class="metric"><span class="label">Calor absorbido por el frío</span><output id="bQabs">—</output></div>
+      <div class="metric"><span class="label">Capacidad calorífica 1</span><output id="bC1">—</output></div>
+      <div class="metric"><span class="label">Capacidad calorífica 2</span><output id="bC2">—</output></div>
+    </div>
+    <div class="cuerpo">
+      <div class="escena">
+        <svg id="mezcla" viewBox="0 0 520 300" role="img" aria-label="Dos cuerpos que igualan su temperatura"></svg>
+        <p class="nota" id="bPie"></p>
+      </div>
+      <div class="panel">
+        <p class="formula">m₁ · c₁ · (T<sub>eq</sub> − T₁) + m₂ · c₂ · (T<sub>eq</sub> − T₂) = 0</p>
+        <div class="campo">
+          <label for="bS1">Cuerpo 1</label>
+          <select id="bS1">
+            <option value="agua" selected>Agua</option>
+            <option value="hierro">Hierro</option>
+            <option value="aluminio">Aluminio</option>
+            <option value="cobre">Cobre</option>
+          </select>
+        </div>
+        <div class="campo">
+          <label for="bM1">Masa 1 <span class="valor" id="vBM1"></span></label>
+          <input type="range" id="bM1" min="0.1" max="5" step="0.1" value="1">
+        </div>
+        <div class="campo">
+          <label for="bT1">Temperatura 1 <span class="valor" id="vBT1"></span></label>
+          <input type="range" id="bT1" min="0" max="100" step="1" value="20">
+        </div>
+        <div class="campo">
+          <label for="bS2">Cuerpo 2</label>
+          <select id="bS2">
+            <option value="agua">Agua</option>
+            <option value="hierro" selected>Hierro</option>
+            <option value="aluminio">Aluminio</option>
+            <option value="cobre">Cobre</option>
+          </select>
+        </div>
+        <div class="campo">
+          <label for="bM2">Masa 2 <span class="valor" id="vBM2"></span></label>
+          <input type="range" id="bM2" min="0.1" max="5" step="0.1" value="0.5">
+        </div>
+        <div class="campo">
+          <label for="bT2">Temperatura 2 <span class="valor" id="vBT2"></span></label>
+          <input type="range" id="bT2" min="0" max="100" step="1" value="90">
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+"use strict";
+
+/* ---------- física (funciones puras: se pueden probar fuera del navegador) ---------- */
+
+/* c en J/(kg·K); L en J/kg. El agua se trata con sus tres fases; los metales, en el
+   rango de trabajo del interactivo, no cambian de estado. */
+var SUSTANCIAS = {
+  /* con 1 cal = 4,18 J, que es el valor que usa todo el material de la unidad:
+     c_agua = 4 180, c_hielo = la mitad = 2 090, L_f = 80 kcal/kg = 334 400 J/kg */
+  agua:     {etq:"Agua",     c:4180, cSol:2090, cGas:2010, Tf:0,    Tv:100,  Lf:334400, Lv:2257000, fases:true},
+  hierro:   {etq:"Hierro",   c:450,  fases:false, Tfus:1538},
+  aluminio: {etq:"Aluminio", c:900,  fases:false, Tfus:660},
+  cobre:    {etq:"Cobre",    c:385,  fases:false, Tfus:1085}
+};
+
+/* MODO A: temperatura y estado tras aportar Q julios a una masa m que parte de T0. */
+function calentar(p){
+  var s = SUSTANCIAS[p.sustancia], m = p.masa, Q = p.Q, T0 = p.T0;
+  if (!s.fases){
+    return {T: T0 + Q/(m*s.c), estado:"sólido", Qf:null, Qv:null, tramos:null, etq:s.etq};
+  }
+  /* umbrales acumulados de calor, contados desde el estado inicial */
+  var Q1 = T0 < s.Tf ? m*s.cSol*(s.Tf - T0) : 0;          // calentar el hielo hasta 0 °C
+  var Q2 = Q1 + m*s.Lf;                                    // fundirlo
+  var base = T0 < s.Tf ? s.Tf : T0;
+  var Q3 = Q2 + m*s.c*(s.Tv - base);                       // llevar el líquido a 100 °C
+  var Q4 = Q3 + m*s.Lv;                                    // evaporarlo
+  var yaLiquida = T0 >= s.Tf;
+  if (yaLiquida){ Q1 = 0; Q2 = 0; Q3 = m*s.c*(s.Tv - T0); Q4 = Q3 + m*s.Lv; }
+
+  var T, estado;
+  if (Q < Q1)      { T = T0 + Q/(m*s.cSol);          estado = "hielo"; }
+  else if (Q < Q2) { T = s.Tf;                        estado = "fundiendo"; }
+  else if (Q < Q3) { T = base + (Q-Q2)/(m*s.c);       estado = "agua líquida"; }
+  else if (Q < Q4) { T = s.Tv;                        estado = "hirviendo"; }
+  else             { T = s.Tv + (Q-Q4)/(m*s.cGas);    estado = "vapor"; }
+
+  /* si parte de agua líquida no hay nada que fundir: el panel tiene que poner «—», no
+     un 0 kJ que se lee como «fundir esto no cuesta nada» */
+  return {T:T, estado:estado, Qf: yaLiquida ? null : Q2, Qv:Q4, etq:s.etq,
+          tramos:{Q1:Q1, Q2:Q2, Q3:Q3, Q4:Q4, Tf:s.Tf, Tv:s.Tv, T0:T0}};
+}
+
+/* MODO B: temperatura de equilibrio de dos cuerpos sin cambio de estado. */
+function mezclar(p){
+  var c1 = SUSTANCIAS[p.s1].c, c2 = SUSTANCIAS[p.s2].c;
+  var C1 = p.m1*c1, C2 = p.m2*c2;
+  var Teq = (C1*p.T1 + C2*p.T2)/(C1 + C2);
+  return {Teq:Teq, C1:C1, C2:C2,
+          Qabs: C1*(Teq - p.T1), Qced: C2*(Teq - p.T2),
+          etq1:SUSTANCIAS[p.s1].etq, etq2:SUSTANCIAS[p.s2].etq};
+}
+
+if (typeof module !== "undefined" && module.exports){
+  module.exports = {calentar:calentar, mezclar:mezclar, SUSTANCIAS:SUSTANCIAS};
+}
+
+/* ---------- interfaz ---------- */
+if (typeof document !== "undefined") (function(){
+  var $ = function(id){ return document.getElementById(id); };
+  var num = function(x,d){ return x.toLocaleString("es-ES",{minimumFractionDigits:d,maximumFractionDigits:d}); };
+  var kJ = function(j,d){ return num(j/1000, d===undefined?0:d)+" kJ"; };
+
+  /* ---- modo A ---- */
+  function leerA(){
+    return {sustancia:$("aSust").value, masa:+$("aMasa").value,
+            T0:+$("aT0").value, Q:(+$("aQin").value)*1000};
+  }
+
+  function ejeY(T, T0, Tmax, y0, y1){
+    return y1 + (y0 - y1)*(T - T0)/(Tmax - T0);
+  }
+
+  function dibujarA(p, r){
+    var W=520, H=320, ml=54, mr=16, mt=14, mb=40;
+    var x0=ml, x1=W-mr, y0=H-mb, y1=mt;
+    var Qmax = 2000000;                                  // el tope del deslizador, en J
+    /* el eje de temperaturas crece con lo que haya que representar: si no, el vapor
+       recalentado se sale por arriba y el punto actual queda fuera de su curva. */
+    var Tmin = -50, Tmax = Math.max(160, Math.ceil(r.T/100)*100);
+    var px = function(Q){ return x0 + (x1-x0)*Math.min(Q,Qmax)/Qmax; };
+    var py = function(T){ return y0 + (y1-y0)*(Math.max(Math.min(T,Tmax),Tmin) - Tmin)/(Tmax - Tmin); };
+
+    var g = ['<rect x="'+x0+'" y="'+y1+'" width="'+(x1-x0)+'" height="'+(y0-y1)+'" fill="#fbfbfe" stroke="#d6dbe5"/>'];
+    /* rejilla y rótulos de temperatura */
+    var ticks = [-40,0,40,100,160].filter(function(T){ return T <= Tmax; });
+    if (Tmax > 160) ticks.push(Tmax);
+    ticks.forEach(function(T){
+      var y = py(T);
+      g.push('<line x1="'+x0+'" y1="'+y.toFixed(1)+'" x2="'+x1+'" y2="'+y.toFixed(1)+'" stroke="#e6e9f2"/>');
+      g.push('<text x="'+(x0-8)+'" y="'+(y+4).toFixed(1)+'" font-size="11" text-anchor="end" fill="#5d6b74">'+T+'</text>');
+    });
+    for (var q=0;q<=2000;q+=500){
+      var x = px(q*1000);
+      g.push('<line x1="'+x.toFixed(1)+'" y1="'+y1+'" x2="'+x.toFixed(1)+'" y2="'+y0+'" stroke="#eef0f7"/>');
+      g.push('<text x="'+x.toFixed(1)+'" y="'+(y0+16)+'" font-size="11" text-anchor="middle" fill="#5d6b74">'+q+'</text>');
+    }
+    g.push('<text x="'+((x0+x1)/2)+'" y="'+(y0+33)+'" font-size="12" text-anchor="middle" fill="#24313a">Calor aportado (kJ)</text>');
+    g.push('<text x="14" y="'+((y0+y1)/2)+'" font-size="12" text-anchor="middle" fill="#24313a" transform="rotate(-90 14 '+((y0+y1)/2)+')">Temperatura (°C)</text>');
+
+    /* curva. Se construye entera y DESPUÉS se recorta en Qmax interpolando: si se
+       extrapolara hasta Qmax un tramo que aún no ha empezado (el vapor, cuando el
+       deslizador no llega a evaporar), la línea se desploma fuera del gráfico. */
+    var pts = [];
+    if (r.tramos){
+      var t = r.tramos;
+      pts.push([0, t.T0]);
+      if (t.Q1 > 0){ pts.push([t.Q1, t.Tf]); }
+      if (t.Q2 > t.Q1){ pts.push([t.Q2, t.Tf]); }
+      pts.push([t.Q3, t.Tv]);
+      pts.push([t.Q4, t.Tv]);
+      if (t.Q4 < Qmax){
+        pts.push([Qmax, t.Tv + (Qmax - t.Q4)/(p.masa*SUSTANCIAS.agua.cGas)]);
+      }
+    } else {
+      var c = SUSTANCIAS[p.sustancia].c;
+      pts.push([0, p.T0]); pts.push([Qmax, p.T0 + Qmax/(p.masa*c)]);
+    }
+    /* recorte por el borde derecho (Q) y por el borde superior (T). El de T importa:
+       sin él, el último vértice se dibujaba con la temperatura aplastada contra el tope
+       de la escala, y eso no recorta la recta, le cambia la pendiente — con lo que el
+       punto actual quedaba fuera de su propia curva en cuanto la sustancia no era agua. */
+    function recortar(lista, eje, tope){
+      var fuera = [];
+      for (var i=0;i<lista.length;i++){
+        if (lista[i][eje] <= tope){ fuera.push(lista[i]); continue; }
+        if (i > 0){
+          var a = lista[i-1], b = lista[i], d = b[eje] - a[eje];
+          var f = d ? (tope - a[eje])/d : 0;
+          fuera.push([a[0] + f*(b[0]-a[0]), a[1] + f*(b[1]-a[1])]);
+        }
+        break;
+      }
+      return fuera;
+    }
+    pts = recortar(recortar(pts, 0, Qmax), 1, Tmax);
+    var d = pts.map(function(q,i){ return (i?"L":"M")+px(q[0]).toFixed(1)+" "+py(q[1]).toFixed(1); }).join(" ");
+    g.push('<path d="'+d+'" fill="none" stroke="#2f6fb0" stroke-width="3" stroke-linejoin="round"/>');
+
+    /* punto actual */
+    g.push('<line x1="'+px(p.Q).toFixed(1)+'" y1="'+y1+'" x2="'+px(p.Q).toFixed(1)+'" y2="'+y0+'" stroke="#e67e22" stroke-dasharray="4 4"/>');
+    g.push('<circle cx="'+px(p.Q).toFixed(1)+'" cy="'+py(r.T).toFixed(1)+'" r="6" fill="#e67e22" stroke="#fff" stroke-width="2"/>');
+    $("graf").innerHTML = g.join("");
+  }
+
+  function pintarA(){
+    var p = leerA(), r = calentar(p);
+    $("vAMasa").textContent = num(p.masa,1)+" kg";
+    $("vAT0").textContent   = num(p.T0,0)+" °C";
+    $("vAQ").textContent    = num(p.Q/1000,0)+" kJ";
+    var fases = SUSTANCIAS[p.sustancia].fases;
+    $("aFormula").innerHTML = fases ? "Q = m · c · ΔT &nbsp;·&nbsp; Q = m · L" : "Q = m · c · ΔT";
+    $("aT0").disabled = false;
+
+    $("aEstado").textContent = r.estado;
+    $("aT").textContent = num(r.T,1)+" °C";
+    $("aQ").textContent = kJ(p.Q);
+    $("aQf").textContent = r.Qf === null ? "—" : kJ(r.Qf);
+    $("aQv").textContent = r.Qv === null ? "—" : kJ(r.Qv);
+
+    var av = $("aAviso"), s = SUSTANCIAS[p.sustancia];
+    if (fases && (r.estado === "fundiendo" || r.estado === "hirviendo")){
+      av.hidden = false;
+      av.textContent = "Sigues aportando calor y la temperatura no sube: toda la energía se emplea en "
+        + (r.estado === "fundiendo" ? "fundir el hielo" : "evaporar el agua") + ".";
+    } else if (!fases && s.Tfus && r.T > s.Tfus){
+      /* los metales se modelan solo en estado sólido: hay que decirlo en cuanto se
+         pasa de su temperatura de fusión, o el resultado parece válido y no lo es */
+      av.hidden = false;
+      av.textContent = "Ojo: " + s.etq.toLowerCase() + " funde a " + num(s.Tfus,0)
+        + " °C. Por encima de esa temperatura este cálculo deja de valer, porque aquí los"
+        + " metales se tratan siempre como sólidos.";
+    } else { av.hidden = true; }
+
+    $("aPie").textContent = r.etq + " · " + num(p.masa,1) + " kg · con "
+      + num(p.Q/1000,0) + " kJ se queda en " + num(r.T,1) + " °C (" + r.estado + ").";
+    dibujarA(p, r);
+  }
+
+  /* ---- modo B ---- */
+  function leerB(){
+    return {s1:$("bS1").value, m1:+$("bM1").value, T1:+$("bT1").value,
+            s2:$("bS2").value, m2:+$("bM2").value, T2:+$("bT2").value};
+  }
+
+  function dibujarB(p, r){
+    var g = [], y = function(T){ return 250 - 190*T/100; };
+    /* dos termómetros y la línea de equilibrio */
+    [[130, p.m1, p.T1, r.etq1, "#2f6fb0"], [390, p.m2, p.T2, r.etq2, "#b23b3b"]].forEach(function(c){
+      var x = c[0];
+      g.push('<rect x="'+(x-34)+'" y="'+y(100).toFixed(1)+'" width="68" height="'+(250-y(100)).toFixed(1)+'" fill="#fbfbfe" stroke="#d6dbe5" rx="8"/>');
+      g.push('<rect x="'+(x-34)+'" y="'+y(c[2]).toFixed(1)+'" width="68" height="'+(250-y(c[2])).toFixed(1)+'" fill="'+c[4]+'" opacity="0.28" rx="8"/>');
+      /* halo blanco: la línea de equilibrio puede pasar justo por detrás del rótulo */
+      g.push('<text x="'+x+'" y="'+(y(c[2])-8).toFixed(1)+'" font-size="13" text-anchor="middle" fill="#24313a" stroke="#fff" stroke-width="4" paint-order="stroke">'+c[2]+' °C</text>');
+      g.push('<text x="'+x+'" y="272" font-size="12" text-anchor="middle" fill="#5d6b74">'+c[3]+' · '+num(c[1],1)+' kg</text>');
+    });
+    g.push('<line x1="60" y1="'+y(r.Teq).toFixed(1)+'" x2="460" y2="'+y(r.Teq).toFixed(1)+'" stroke="#e67e22" stroke-width="3" stroke-dasharray="7 5"/>');
+    g.push('<text x="470" y="'+(y(r.Teq)+4).toFixed(1)+'" font-size="13" fill="#8a4f12">T eq</text>');
+    g.push('<text x="260" y="'+(y(r.Teq)-10).toFixed(1)+'" font-size="14" text-anchor="middle" font-weight="700" fill="#8a4f12">'+num(r.Teq,1)+' °C</text>');
+    $("mezcla").innerHTML = g.join("");
+  }
+
+  function pintarB(){
+    var p = leerB(), r = mezclar(p);
+    $("vBM1").textContent = num(p.m1,1)+" kg";
+    $("vBT1").textContent = num(p.T1,0)+" °C";
+    $("vBM2").textContent = num(p.m2,1)+" kg";
+    $("vBT2").textContent = num(p.T2,0)+" °C";
+    $("bTeq").textContent = num(r.Teq,2)+" °C";
+    $("bQced").textContent = kJ(Math.abs(r.Qced),1);
+    $("bQabs").textContent = kJ(Math.abs(r.Qabs),1);
+    $("bC1").textContent = num(r.C1,0)+" J/K";
+    $("bC2").textContent = num(r.C2,0)+" J/K";
+    $("bPie").textContent = "El de mayor capacidad calorífica (m · c) arrastra la temperatura final hacia la suya: "
+      + r.etq1 + " " + num(r.C1,0) + " J/K frente a " + r.etq2 + " " + num(r.C2,0) + " J/K.";
+    dibujarB(p, r);
+  }
+
+  /* ---- conmutar modos ---- */
+  function modo(a){
+    $("modoA").hidden = !a; $("modoB").hidden = a;
+    $("btnA").setAttribute("aria-pressed", a ? "true" : "false");
+    $("btnB").setAttribute("aria-pressed", a ? "false" : "true");
+    if (a) pintarA(); else pintarB();
+  }
+  $("btnA").addEventListener("click", function(){ modo(true); });
+  $("btnB").addEventListener("click", function(){ modo(false); });
+
+  ["aSust","aMasa","aT0","aQin"].forEach(function(id){
+    $(id).addEventListener("input", pintarA);
+    $(id).addEventListener("change", pintarA);
+  });
+  ["bS1","bM1","bT1","bS2","bM2","bT2"].forEach(function(id){
+    $(id).addEventListener("input", pintarB);
+    $(id).addEventListener("change", pintarB);
+  });
+
+  pintarA();
+})();
+</script>
+</body>
+</html>
